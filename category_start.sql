@@ -1,3 +1,8 @@
+-- algorithm starts at start_this() function below where a category id is passed and then entities that belong to a
+-- particular source within this category are passed incrementally to the function entity_match() in entity.sql file.
+   
+
+
 CREATE or REPLACE function sources(integer) returns void as 
 $$
 begin
