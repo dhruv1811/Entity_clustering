@@ -235,7 +235,7 @@ from new_string d, cluster_table f
 where not exists(select distinct e.entity_id from temp_matches e where e.entity_id = d.entity_id)
 and d.entity_id = f.entity_id;
 
---- adding numerical columns of the incoming entity to the new cluster formed
+--- adding numerical columns of the unmatched incoming entity to the new cluster formed
 
 
 insert into prefinal_dists(cid,name, value,stdev)
