@@ -73,7 +73,7 @@ where score >= 5.0;
 
 truncate table final;
 
---------- weighted sum for string columns
+--------- weighted sum for string column scores
 
 insert into final(entity_id,cid, score)
 select r.entity_id, r.cid , sum(r.score * u.weight) as score
@@ -83,7 +83,7 @@ group by r.entity_id, r.cid;
 
 truncate table final_dists;
 
------- weighted sum  for numerical columns
+------ weighted sum for numerical column scores
 
 insert into final_dists(entity_id,cid, score)
 select r.entity_id, r.cid, sum(r.score *u.weight) as score
@@ -103,7 +103,7 @@ and final.cid = t.cid;
 
 truncate table temp_matches_temp;
 
------ threshold(k) for weighted sum of the columns 
+----- threshold(k) for weighted sum of the column scores
 
 insert into temp_matches_temp(entity_id, cid,score)
 select  i.entity_id, i.cid, i.score
