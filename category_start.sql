@@ -79,6 +79,11 @@ select source_id, count(distinct entity_id)
 from in_data1
 group by source_id;
 
+INSERT INTO distinct_ents(source_id, entity_id)
+select source_id, entity_id
+from in_data1
+group by source_id, entity_id;
+
 
 INSERT INTO distinct_sources
 select source_id from distinct_entity;
@@ -233,7 +238,8 @@ where in_strings.entity_id = n.entity_id
 and in_strings.att_id = n.att_id;
 
 
--- entities present within a source is passed  incrementally into this function,distinct_ents has columns source_id, entity_id present within a category
+-- entities present within a source is passed  incrementally into this function, distinct_ents has columns
+-- source_id, entity_id present within a category, this function is in entity.sql file
 
 
 perform entity_match(entity_id) from distinct_ents where source_id = $1;
