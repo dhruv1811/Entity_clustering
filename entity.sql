@@ -1,7 +1,7 @@
-------entities are passed here one at a time. Incoming entity is matched with the clusters seen so far and if it 
-      matches a cluster it joins that cluster and centroid of that cluster is updated else this incoming entity forms
-      a new cluster, and after this idf and normalization factor of the grams present in the clusters is updated since 
-      the number of total clusters may change which changes the number of documents. 
+-- entities are passed here one at a time. Incoming entity is matched with the clusters seen so far and if it 
+-- matches a cluster it joins that cluster and centroid of that cluster is updated else this incoming entity forms
+-- a new cluster, and after this idf and normalization factor of the grams present in the clusters is updated since 
+-- the number of total clusters may change which changes the number of documents. 
 
 CREATE OR REPLACE FUNCTION entity_match(integer) RETURNS void AS
 $$
