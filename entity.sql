@@ -227,7 +227,7 @@ from new_string d
 where not exists(select distinct e.entity_id from temp_matches e where e.entity_id = d.entity_id)
 group by d.entity_id;
 
---- entities that dont match already have a cluster id from above so inserting them in strings seen so far 
+--- entities that dont match already have a cluster id from above so inserting them in clusters seen uptill now 
 
 INSERT INTO prefinal_strings(cid, att_id, gram, tf,idf,norm)
 select  f.cid , d.att_id, d.gram, d.tf,d.idf,d.norm
