@@ -217,12 +217,13 @@ from table_temp1;
 RAISE INFO 'INSERTING IN cluster table';
 
 insert into cluster_table(entity_id,cid)
-select distinct e.entity_id, d.cid
+select e.entity_id, d.cid
 from temp_matches e, cluster_table d
-where e.cid = d.cid;
+where e.cid = d.cid
+group by entity_id;
 
 insert into cluster_table(entity_id, cid) 
-select distinct d.entity_id, nextval('seq_no')
+select d.entity_id, nextval('seq_no')
 from new_string d
 where not exists(select distinct e.entity_id from temp_matches e where e.entity_id = d.entity_id)
 group by d.entity_id;
