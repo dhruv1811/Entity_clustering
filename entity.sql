@@ -22,7 +22,7 @@ truncate table new_dist;
 
 insert into new_dist(entity_id,name,value)
    select entity_id, name, value
-   from in_dists
+   from dists
    where entity_id = $1
    group by entity_id, name, value;
 
