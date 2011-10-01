@@ -20,11 +20,11 @@ insert into new_string(entity_id,att_id, gram, tf, idf, norm)
 
 truncate table new_dist;
 
-insert into new_dist(entity_id,name,value,stdev)
-   select entity_id, name, value, stdev
+insert into new_dist(entity_id,name,value)
+   select entity_id, name, value
    from in_dists
    where entity_id = $1
-   group by entity_id, name, value, stdev;
+   group by entity_id, name, value;
 
 
 raise info 'compare';
@@ -50,7 +50,7 @@ truncate table temp_a;
 
 insert into temp_a(entity_id, cid, name, score)
     select d.entity_id, e.cid ,d.name, (abs(d.value::float - e.value::float)  / e.stdev)
-    from new_dist d , prefinal_dists e 
+    from new_dist d , seen_dists e 
     where d.name = e.name
     and e.stdev <> 0 
     group by d.entity_id, e.cid,d.name,d.value,e.value,e.stdev;
@@ -238,21 +238,21 @@ and d.entity_id = f.entity_id;
 --- adding numerical columns of the unmatched incoming entity to the new cluster formed
 
 
-insert into prefinal_dists(cid,name, value,stdev)
-select f.cid, d.name, d.value,d.stdev
+insert into prefinal_dists(cid,name, value)
+select f.cid, d.name, d.value
 from new_dist d, cluster_table f
 where not exists(select distinct entity_id from temp_matches e where e.entity_id = d.entity_id)
 and d.entity_id = f.entity_id
-group by f.cid,d.name,d.value,d.stdev;
+group by f.cid,d.name,d.value;
 
 
 ---- if there is a match on numerical column then inserting that column from the incoming entity into the cluster matched  
 
-insert into prefinal_dists(cid, name, value,stdev)
-select t.cid, i.name, i.value,i.stdev
+insert into prefinal_dists(cid, name, value)
+select t.cid, i.name, i.value
 from new_dist i, temp_matches t
 where i.entity_id = t.entity_id
-group by t.cid,i.name,i.value,i.stdev;
+group by t.cid,i.name,i.value;
 
 
 
@@ -329,17 +329,21 @@ insert into seen_dist_sums( name , n, sm , smsqr )
       GROUP BY name;
 
 
-
 insert into seen_temp_dists( name,count, mean, stdev )
 SELECT  name, n, sm/n mean, sqrt(abs((smsqr - sm*sm/n) / (n-1)) ) stdev
  FROM seen_dist_sums
  WHERE n > 1;
 
+truncate table seen_dists;
 
-update prefinal_dists
+insert into seen_dists(cid, name, value, stdev)
+select cid, name, value, NULL
+from prefinal_dists;
+
+update seen_dists
 set stdev =  a.stdev
 from seen_temp_dists a 
-where a.name = prefinal_dists.name;
+where seen_dists.name = a.name;
 
 
 end
