@@ -156,28 +156,6 @@ select name, ((count(distinct value)::float)/(count(value)::float)) *  (log(15,(
 group by name;
 
 
------------- calculating the standard deviation for incoming numerical columns 
-
-INSERT INTO in_dist_sums( name , n, sm , smsqr )
-     SELECT name, COUNT(*) n,
-            SUM(value::float)::float sm, SUM(value::float*value::float)::float smsqr
-       FROM dists
-       GROUP BY name;
-
- 
-INSERT INTO temp_dists( name,count, mean, stdev )
-SELECT name, n, sm/n mean, sqrt( (smsqr - sm*sm/n) / (n-1) ) stdev
- FROM in_dist_sums
- WHERE n > 1;
-
-
-INSERT INTO in_dists(entity_id, name, value, stdev) 
-select i.entity_id , i.name, i.value, d.stdev
-from dists i, temp_dists d
-where i.name = d.name
-group by i.entity_id, i.name, i.value, d.stdev;
-
-
 ------  ngrams and tf, idf and norms(normalization factor) for incoming columns
 
 INSERT INTO  in_val_ngrams_yo(source_id , entity_id, att_id, gram)
