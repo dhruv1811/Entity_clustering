@@ -220,7 +220,7 @@ insert into cluster_table(entity_id,cid)
 select e.entity_id, d.cid
 from temp_matches e, cluster_table d
 where e.cid = d.cid
-group by entity_id;
+group by e.entity_id;
 
 insert into cluster_table(entity_id, cid) 
 select d.entity_id, nextval('seq_no')
