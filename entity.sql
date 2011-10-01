@@ -1,5 +1,7 @@
-
-------entities are passed here one at a time
+-- entities are passed here one at a time. Incoming entity is matched with the clusters seen so far and if it 
+-- matches a cluster it joins that cluster and centroid of that cluster is updated else this incoming entity forms
+-- a new cluster, and after this idf and normalization factor of the grams present in the clusters is updated since 
+-- the number of total clusters may change which changes the number of documents. 
 
 CREATE OR REPLACE FUNCTION entity_match(integer) RETURNS void AS
 $$
@@ -18,11 +20,11 @@ insert into new_string(entity_id,att_id, gram, tf, idf, norm)
 
 truncate table new_dist;
 
-insert into new_dist(entity_id,name,value,stdev)
-   select entity_id, name, value, stdev
-   from in_dists
+insert into new_dist(entity_id,name,value)
+   select entity_id, name, value
+   from dists
    where entity_id = $1
-   group by entity_id, name, value, stdev;
+   group by entity_id, name, value;
 
 
 raise info 'compare';
@@ -48,7 +50,7 @@ truncate table temp_a;
 
 insert into temp_a(entity_id, cid, name, score)
     select d.entity_id, e.cid ,d.name, (abs(d.value::float - e.value::float)  / e.stdev)
-    from new_dist d , prefinal_dists e 
+    from new_dist d , seen_dists e 
     where d.name = e.name
     and e.stdev <> 0 
     group by d.entity_id, e.cid,d.name,d.value,e.value,e.stdev;
@@ -71,7 +73,7 @@ where score >= 5.0;
 
 truncate table final;
 
---------- weighted sum for string columns
+--------- weighted sum for string column scores
 
 insert into final(entity_id,cid, score)
 select r.entity_id, r.cid , sum(r.score * u.weight) as score
@@ -81,7 +83,7 @@ group by r.entity_id, r.cid;
 
 truncate table final_dists;
 
------- weighted sum  for numerical columns
+------ weighted sum for numerical column scores
 
 insert into final_dists(entity_id,cid, score)
 select r.entity_id, r.cid, sum(r.score *u.weight) as score
@@ -101,7 +103,7 @@ and final.cid = t.cid;
 
 truncate table temp_matches_temp;
 
------ threshold(k) for weighted sum of the columns 
+----- threshold(k) for weighted sum of the column scores
 
 insert into temp_matches_temp(entity_id, cid,score)
 select  i.entity_id, i.cid, i.score
@@ -215,17 +217,18 @@ from table_temp1;
 RAISE INFO 'INSERTING IN cluster table';
 
 insert into cluster_table(entity_id,cid)
-select distinct e.entity_id, d.cid
+select e.entity_id, d.cid
 from temp_matches e, cluster_table d
-where e.cid = d.cid;
+where e.cid = d.cid
+group by e.entity_id;
 
 insert into cluster_table(entity_id, cid) 
-select distinct d.entity_id, nextval('seq_no')
+select d.entity_id, nextval('seq_no')
 from new_string d
 where not exists(select distinct e.entity_id from temp_matches e where e.entity_id = d.entity_id)
 group by d.entity_id;
 
---- entities that dont match already have a cluster id from above so inserting them in strings seen so far 
+--- entities that dont match already have a cluster id from above so inserting them in clusters seen uptill now 
 
 INSERT INTO prefinal_strings(cid, att_id, gram, tf,idf,norm)
 select  f.cid , d.att_id, d.gram, d.tf,d.idf,d.norm
@@ -233,24 +236,24 @@ from new_string d, cluster_table f
 where not exists(select distinct e.entity_id from temp_matches e where e.entity_id = d.entity_id)
 and d.entity_id = f.entity_id;
 
---- adding numerical columns of the incoming entity to the new cluster formed
+--- adding numerical columns of the unmatched incoming entity to the new cluster formed
 
 
-insert into prefinal_dists(cid,name, value,stdev)
-select f.cid, d.name, d.value,d.stdev
+insert into prefinal_dists(cid,name, value)
+select f.cid, d.name, d.value
 from new_dist d, cluster_table f
 where not exists(select distinct entity_id from temp_matches e where e.entity_id = d.entity_id)
 and d.entity_id = f.entity_id
-group by f.cid,d.name,d.value,d.stdev;
+group by f.cid,d.name,d.value;
 
 
 ---- if there is a match on numerical column then inserting that column from the incoming entity into the cluster matched  
 
-insert into prefinal_dists(cid, name, value,stdev)
-select t.cid, i.name, i.value,i.stdev
+insert into prefinal_dists(cid, name, value)
+select t.cid, i.name, i.value
 from new_dist i, temp_matches t
 where i.entity_id = t.entity_id
-group by t.cid,i.name,i.value,i.stdev;
+group by t.cid,i.name,i.value;
 
 
 
@@ -327,17 +330,21 @@ insert into seen_dist_sums( name , n, sm , smsqr )
       GROUP BY name;
 
 
-
 insert into seen_temp_dists( name,count, mean, stdev )
 SELECT  name, n, sm/n mean, sqrt(abs((smsqr - sm*sm/n) / (n-1)) ) stdev
  FROM seen_dist_sums
  WHERE n > 1;
 
+truncate table seen_dists;
 
-update prefinal_dists
+insert into seen_dists(cid, name, value, stdev)
+select cid, name, value, NULL
+from prefinal_dists;
+
+update seen_dists
 set stdev =  a.stdev
 from seen_temp_dists a 
-where a.name = prefinal_dists.name;
+where seen_dists.name = a.name;
 
 
 end

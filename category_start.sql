@@ -1,3 +1,8 @@
+-- algorithm starts at start_this() function below where a category id is passed and then entities that belong to a
+-- particular source within this category are passed incrementally to the function entity_match() in entity.sql file.
+   
+
+
 CREATE or REPLACE function sources(integer) returns void as 
 $$
 begin
@@ -35,6 +40,7 @@ truncate table cluster_table;
 truncate table test_category;
 truncate table test_matching;
 truncate table test_entity;
+truncate table seen_dists;
 
 
 ----test category will have data from the entities present in the Goby match for the category passed above
@@ -74,6 +80,11 @@ select source_id, count(distinct entity_id)
 from in_data1
 group by source_id;
 
+INSERT INTO distinct_ents(source_id, entity_id)
+select source_id, entity_id
+from in_data1
+group by source_id, entity_id;
+
 
 INSERT INTO distinct_sources
 select source_id from distinct_entity;
@@ -109,7 +120,7 @@ BEGIN
 
 RAISE INFO 'NEW SOURCE_ID';
 
------ getting the global_id's for the incoming columns
+----- getting the global_id's(att_id) for the incoming string columns
 
 INSERT INTO att_ids(source_id,entity_id,att_id,value)
 select i.source_id, i.entity_id, g.global_id as att_id, i.value
@@ -130,6 +141,8 @@ from att_ids
 group by att_id;
 
 
+----- data for numerical columns
+
 INSERT INTO dists(entity_id, name, value)
 select entity_id, name, value
 from in_data1 
@@ -144,28 +157,6 @@ INSERT INTO UC_dists(name, weight)
 select name, ((count(distinct value)::float)/(count(value)::float)) *  (log(15,(count(value)::numeric))) as weight
  from dists
 group by name;
-
-
------------- calculating the standard deviation for incoming numerical columns 
-
-INSERT INTO in_dist_sums( name , n, sm , smsqr )
-     SELECT name, COUNT(*) n,
-            SUM(value::float)::float sm, SUM(value::float*value::float)::float smsqr
-       FROM dists
-       GROUP BY name;
-
- 
-INSERT INTO temp_dists( name,count, mean, stdev )
-SELECT name, n, sm/n mean, sqrt( (smsqr - sm*sm/n) / (n-1) ) stdev
- FROM in_dist_sums
- WHERE n > 1;
-
-
-INSERT INTO in_dists(entity_id, name, value, stdev) 
-select i.entity_id , i.name, i.value, d.stdev
-from dists i, temp_dists d
-where i.name = d.name
-group by i.entity_id, i.name, i.value, d.stdev;
 
 
 ------  ngrams and tf, idf and norms(normalization factor) for incoming columns
@@ -228,7 +219,8 @@ where in_strings.entity_id = n.entity_id
 and in_strings.att_id = n.att_id;
 
 
--- entities present within a source is passed  incrementally into this function,distinct_ents has columns source_id, entity_id present within a category
+-- entities present within a source is passed  incrementally into this function, distinct_ents has columns
+-- source_id, entity_id present within a category, this function is in entity.sql file
 
 
 perform entity_match(entity_id) from distinct_ents where source_id = $1;
