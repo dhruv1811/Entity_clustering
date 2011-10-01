@@ -119,7 +119,7 @@ BEGIN
 
 RAISE INFO 'NEW SOURCE_ID';
 
------ getting the global_id's for the incoming columns
+----- getting the global_id's(att_id) for the incoming string columns
 
 INSERT INTO att_ids(source_id,entity_id,att_id,value)
 select i.source_id, i.entity_id, g.global_id as att_id, i.value
@@ -139,6 +139,8 @@ select att_id, ((count(distinct value)::float)/(count(value)::float)) * (log(15,
 from att_ids
 group by att_id;
 
+
+----- data for numerical columns
 
 INSERT INTO dists(entity_id, name, value)
 select entity_id, name, value
