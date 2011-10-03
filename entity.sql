@@ -14,6 +14,27 @@ BEGIN
 
 raise info 'compare';
 
+truncate table new_string;
+
+insert into new_string(entity_id,att_id, gram, tf, idf, norm)
+select entity_id,att_id, gram, tf, idf, norm
+from in_strings
+where  entity_id = $1
+group by entity_id,att_id,gram,tf,idf,norm;
+
+
+truncate table new_dist;
+
+insert into new_dist(entity_id,name,value,stdev)
+select entity_id, name, value, stdev
+from in_dists
+where entity_id = $1
+group by entity_id, name, value, stdev;
+
+
+
+
+
 truncate table results;                                  // 6.45 ms
 
 
@@ -23,10 +44,9 @@ truncate table results;                                  // 6.45 ms
 
 insert into results(entity_id,cid, att_id, score)        // 2.28 ms
      select  d.entity_id, e.cid , d.att_id, ((SUM(d.tf*d.idf * e.tf*e.idf)::float) / (d.norm * e.norm)) as score
-     FROM in_strings d, prefinal_strings e
+     FROM new_string d, prefinal_strings e
      WHERE d.gram = e.gram
      AND d.att_id =e.att_id
-     AND d.entity_id = $1
      GROUP BY d.entity_id,e.cid, d.att_id,d.norm,e.norm;
 
 
@@ -37,10 +57,9 @@ truncate table temp_a;                                  // 15.84 ms
 
 insert into temp_a(entity_id, cid, name, score)         // 1.36 ms
     select d.entity_id, e.cid ,d.name, (abs(d.value::float - e.value::float)  / e.stdev)
-    from dists d , seen_dists e 
+    from new_dist d , seen_dists e 
     where d.name = e.name
     and e.stdev <> 0
-    and d.entity_id = $1
     group by d.entity_id, e.cid,d.name,d.value,e.value,e.stdev;
 
 
