@@ -41,6 +41,7 @@ truncate table test_category;
 truncate table test_matching;
 truncate table test_entity;
 truncate table seen_dists;
+truncate table distinct_ents;
 
 
 ----test category will have data from the entities present in the Goby match for the category passed above
