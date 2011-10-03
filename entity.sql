@@ -135,7 +135,7 @@ where t.score = s.score ;
 
 truncate table temp_strings;                              // 17.06 ms
  
----- getting the att_id's and grams for the matched entities
+---- getting the att_id's and grams for the matched entity
 
 insert into temp_strings(entity_id, cid, att_id, gram)    //  1.5 ms
 select t.entity_id, t.cid, i.att_id, i.gram
