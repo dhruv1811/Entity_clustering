@@ -7,52 +7,35 @@ CREATE OR REPLACE FUNCTION entity_match(integer) RETURNS void AS
 $$
 BEGIN
 
-raise info 'start';
-
-truncate table new_string;
-
-insert into new_string(entity_id,att_id, gram, tf, idf, norm)
-   select entity_id,att_id, gram, tf, idf, norm
-   from in_strings 
-   where  entity_id = $1
-   group by entity_id,att_id,gram,tf,idf,norm;
-
-
-truncate table new_dist;
-
-insert into new_dist(entity_id,name,value)
-   select entity_id, name, value
-   from dists
-   where entity_id = $1
-   group by entity_id, name, value;
-
-
 raise info 'compare';
 
 truncate table results;
 
 
----matching string columns in incoming entities with clusters seen uptill now, entity_id - incoming entity ,  cid - cluster id from clusters seen so far
+--- matching string columns in incoming entities with clusters seen uptill now,
+--- entity_id - incoming entity ,  cid - cluster id from clusters seen so far
+--- in_strings contain the string columns of entities from the incoming source
 
 insert into results(entity_id,cid, att_id, score)
      select  d.entity_id, e.cid , d.att_id, ((SUM(d.tf*d.idf * e.tf*e.idf)::float) / (d.norm * e.norm)) as score
-     FROM new_string d, prefinal_strings e
+     FROM in_strings d, prefinal_strings e
      WHERE d.gram = e.gram
      AND d.att_id =e.att_id
+     AND d.entity_id = $1
      GROUP BY d.entity_id,e.cid, d.att_id,d.norm,e.norm;
-
-
 
 
 truncate table temp_a;
 
--- matching numerical columns in incoming entities with clusters seen uptill now
+--- matching numerical columns in incoming entities with clusters seen so far 
+--- dists contain numerical columns of the entities from the incoming source 
 
 insert into temp_a(entity_id, cid, name, score)
     select d.entity_id, e.cid ,d.name, (abs(d.value::float - e.value::float)  / e.stdev)
-    from new_dist d , seen_dists e 
+    from dists d , seen_dists e 
     where d.name = e.name
-    and e.stdev <> 0 
+    and e.stdev <> 0
+    and d.entity_id = $1
     group by d.entity_id, e.cid,d.name,d.value,e.value,e.stdev;
 
 
