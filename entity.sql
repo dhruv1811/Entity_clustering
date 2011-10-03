@@ -197,7 +197,6 @@ from table_temp1;
 
 --------- inserting in cluster table,  either an entity joins an older cluster or creates a new one 
 
-RAISE INFO 'INSERTING IN cluster table';
 
 insert into cluster_table(entity_id,cid)
 select e.entity_id, d.cid
@@ -303,8 +302,8 @@ from public.seen_strings;
 ---updating standard deviation for numeric columns 
 
 
-truncate seen_dist_sums;
-truncate seen_temp_dists;
+truncate table seen_dist_sums;
+truncate table seen_temp_dists;
 
 insert into seen_dist_sums( name , n, sm , smsqr )
      SELECT name, COUNT(*) n,
