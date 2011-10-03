@@ -2,6 +2,11 @@
 -- matches a cluster it joins that cluster and centroid of that cluster is updated else this incoming entity forms
 -- a new cluster, and after this idf and normalization factor of the grams present in the clusters is updated since 
 -- the number of total clusters may change which changes the number of documents. 
+-- The time is indicated for each sql query, this time is for the case when a new incoming entity is compared
+-- with 500 clusters seen so far.
+
+
+
 
 CREATE OR REPLACE FUNCTION entity_match(integer) RETURNS void AS
 $$
