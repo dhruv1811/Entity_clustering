@@ -25,8 +25,8 @@ CREATE OR REPLACE FUNCTION start_this(integer) RETURNS void AS
 $$
 BEGIN
 
-truncate table public.seen_strings;
-truncate table prefinal_dists;
+truncate table seen_strings;
+truncate table seen_dists;
 truncate table prefinal_strings;
 truncate table tableB;
 truncate table in_fields ;
@@ -40,7 +40,6 @@ truncate table cluster_table;
 truncate table test_category;
 truncate table test_matching;
 truncate table test_entity;
-truncate table seen_dists;
 truncate table distinct_ents;
 
 
