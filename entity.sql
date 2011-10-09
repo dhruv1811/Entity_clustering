@@ -148,7 +148,7 @@ raise info 'updating centroid i.e. tf/2 in seen_strings for the cluster ';
 
 update seen_strings e set tf = e.tf/2 from temp_matches d where d.cid = e.cid;   //18.039 ms
 
-raise info 'combining the tf for matching att_id, gram pair';
+raise info 'updating the tf for matching att_id, gram pair for the cluster';
 
 update seen_strings e set tf = (e.tf+d.tf) from in_strings d, temp_matches f    // 693.321 ms <--------------
        where d.att_id = e.att_id 
