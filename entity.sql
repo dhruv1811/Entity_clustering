@@ -139,30 +139,56 @@ from seen_strings d, temp_matches e
 where d.cid = e.cid; 
 
 
-
 raise info 'updating the centroid setting tf/2 for new_string in case of match ';
 
-update new_string set tf =tf/2 where exists(select * from temp_matches);     //1.317 ms
+update new_string set tf =tf/2 where exists(select * from temp_matches);
+
+
+truncate table cluster_matched;
+
+insert into cluster_matched(cid, att_id, gram, tf, idf, norm)
+select d.cid, d.att_id ,d.gram, d.tf, d.idf, d.norm
+from seen_strings d, temp_matches e
+where d.cid= e.cid
+group by d.cid, d.att_id, d.gram, d.tf, d.idf, d.norm
+;
+
+delete from seen_strings where exists( select * from temp_matches e where e.cid = seen_strings.cid);
+
+truncate table matched_string;
+
+insert into matched_string( att_id, gram)
+select att_id, gram
+from cluster_matched ;
 
 raise info 'updating centroid i.e. tf/2 in seen_strings for the cluster ';
 
-update seen_strings e set tf = e.tf/2 from temp_matches d where d.cid = e.cid;   //18.039 ms
 
-raise info 'updating the tf for matching att_id, gram pair for the cluster';
+update cluster_matched e set tf = e.tf/2;
 
-update seen_strings e set tf = (e.tf+d.tf) from in_strings d, temp_matches f    // 693.321 ms <--------------
-       where d.att_id = e.att_id 
-       and d.gram = e.gram 
-       and f.cid = e.cid;
+raise info 'combining the tf for matching att_id, gram pair';
 
-raise info 'inserting new grams in the cluster if matched from the incoming entity';
-       
-insert into seen_strings(cid, att_id, gram, tf, idf, norm)        //3.579 ms
+update cluster_matched e set tf = (e.tf+d.tf) from in_strings d
+       where  d.att_id = e.att_id
+       and d.gram = e.gram ;
+
+
+insert into cluster_matched(cid, att_id, gram, tf, idf, norm)
 select d.cid, e.att_id, e.gram, e.tf, e.idf, e.norm
 from temp_matches d, new_string e
 where not exists ( select * from matched_string f where e.att_id = f.att_id and e.gram = f.gram)
-group by d.cid, e.att_id, e.gram, e.tf, e.idf, e.norm;  
+group by d.cid, e.att_id, e.gram, e.tf, e.idf, e.norm;
 
+insert into cluster_mathced_norm(att_id, norm)
+select att_id, round((sqrt(SUM((tf*idf)^2))),5) norm
+from cluster_matched
+group by att_id;
+
+update cluster_matched set norm = n.norm from cluster_matched_norm n where cluster_matched.att_id = n.att_id;
+
+insert into seen_strings(cid, att_id, gram, tf, idf, norm)
+select cid, att_id, gram, tf, idf, norm
+from cluster_matched;
 
 
 RAISE INFO 'inserting in  cluster table for the case of match';
