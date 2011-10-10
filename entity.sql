@@ -9,8 +9,15 @@
 
 CREATE OR REPLACE FUNCTION entity_match(integer) RETURNS void AS
 $$
-BEGIN
+DECLARE   
+         
+seqnum int;
+         
+BEGIN  
 
+seqnum :=  nextval('counter');
+      
+raise info 'start';
 
 
 truncate table new_string;
@@ -229,6 +236,10 @@ where f.entity_id = $1
 group by f.cid, d.name, d.value, d.stdev;
 
 
+-- updating idf/norm after every 100th iteration
+
+if (seqnum%100 = 0) then
+
 raise info 'distinct_entiti';
 
 truncate table distinct_entiti;
@@ -275,6 +286,7 @@ from seen_norms n
 where seen_strings.cid = n.cid
 and seen_strings.att_id = n.att_id;
 
+end if;
 
 
 -- updating standard deviation of the numerical columns of the clusters seen so far 
