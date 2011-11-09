@@ -345,8 +345,8 @@ $$ language plpythonu;
 
 
 
-drop table if exists output48;
-create table output48(category_id integer, entity integer, fp integer, fn integer);
+drop table if exists output;
+create table output(category_id integer, entity integer, fp integer, fn integer);
 
 drop table if exists att_ids;
 drop table if exists UC_strings;
