@@ -1,2 +1,7 @@
+This code has been tested on Goby.com data set. The steps to execute this code are :-
+
 1. Create a new schema.
-2. 
+2. Next step is to include files category_start.sql and entity.sql in this new schema created.
+3. Execute the code for a particular category by using :- select start_this(category_id);
+4. You can view the output of this code in the table "output" which has the columns category_id, total entities,
+   false positives, false negatives. 
