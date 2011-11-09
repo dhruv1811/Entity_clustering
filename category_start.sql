@@ -19,7 +19,7 @@
  * SOFTWARE.
  */
 
------here a source_id is passed in the beginning
+-----takes source_id, category_id as an input 
 
 CREATE OR REPLACE FUNCTION UC_scores1( integer, integer) RETURNS void AS
 $$
@@ -286,11 +286,8 @@ perform fpfn($1);
 END
 $$ LANGUAGE plpgsql;
 
--- algorithm starts at start_this() function below where a category id is passed and then entities that belong to a
--- particular source within this category are passed incrementally to the function entity_match() in entity.sql file.
+
    
-
-
 drop sequence if exists sequence1;
 drop sequence if exists counter;
 
