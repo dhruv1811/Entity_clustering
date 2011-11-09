@@ -280,10 +280,9 @@ and seen_strings.att_id = n.att_id;
 end if;
 
 
--------------------------------------------------------------------------------  CLUSTER_TABLE
 RAISE INFO 'inserting in  cluster table for the case of match';
 
----------changed the code here
+
 
 if exists(select * from temp_matches e where e.cid > 1) then
 
@@ -322,10 +321,7 @@ and f.cid >1
 group by f.cid, d.name, d.value, d.stdev;
 
 
-
-
----------------------- ok here is the point where you need to update your code with if else
-
+--updating idf on every 100th iteration
 
 if (hello%100 = 0) then
 
@@ -427,20 +423,13 @@ drop table if exists fn3 cascade;
 
 
 create table jj(global_id integer, cid integer, entity_id integer);
-
---create table scoringsfp(cid integer, score integer);
 create table fp1(global_id integer, cid integer, entity_id integer);
-create table table231(cid integer, count1 integer, count2 integer);
 create table fp(cid integer, count integer);
 create table fp2(global_id integer,cid integer, count integer);
 create table fp3(entity_id integer);
-
-
---create table scoringsfn(global_id integer, score integer);
 create table fn1(global_id integer, cid integer, entity_id integer);
 create table fn2(global_id integer,cid integer, count integer);
 create table fn3(entity_id integer);
-create table  table232(global_id integer, count1 integer, count2 integer);
 create table fn(global_id integer, count integer);
 create table scoringsfp1(count integer);
 create table scoringsfn1(count integer);
@@ -532,7 +521,7 @@ insert into  scoringsfn1(count)
 from fn3;
 
 
-insert into output48(category_id,entity, fp, fn)
+insert into output(category_id,entity, fp, fn)
 select $1, count(distinct d.entity_id), k.count, p.count
 from test_category d, scoringsfp1 k, scoringsfn1 p
 group by k.count, p.count;
