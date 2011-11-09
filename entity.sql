@@ -1,29 +1,56 @@
--- entities are passed here one at a time. Incoming entity is matched with the clusters seen so far and if it 
--- matches a cluster it joins that cluster and centroid of that cluster is updated else this incoming entity forms
--- a new cluster, and after this idf and normalization factor of the grams present in the clusters is updated since 
--- the number of total clusters may change which changes the number of documents. 
--- The time is indicated for each sql statement, this time is for the case when a new incoming entity is compared
--- with 330 clusters seen so far.
+/* Copyright (c) 2011 Massachusetts Institute of Technology
+ *
+ * Permission is hereby granted, free of charge, to any person obtaining a copy
+ * of this software and associated documentation files (the "Software"), to
+ * deal in the Software without restriction, including without limitation the
+ * rights to use, copy, modify, merge, publish, distribute, sublicense, and/or
+ * sell copies of the Software, and to permit persons to whom the Software is
+ * furnished to do so, subject to the following conditions:
+ *
+ * The above copyright notice and this permission notice shall be included in
+ * all copies or substantial portions of the Software.
+ *
+ * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+ * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+ * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+ * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+ * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+ * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+ * SOFTWARE.
+ */
 
 
 
-CREATE OR REPLACE FUNCTION entity_match(integer) RETURNS void AS
+/*
+* entities are passed here one at a time. Incoming entity is matched with the clusters seen so far and if it 
+* matches a cluster it joins that cluster and centroid of that cluster is updated else this incoming entity forms
+* a new cluster, and after this idf and normalization factor of the grams present in the clusters is updated since 
+* the number of total clusters may change which changes the number of documents. 
+*/
+
+
+
+CREATE OR REPLACE FUNCTION UC_entity(integer, integer) RETURNS void AS
 $$
-DECLARE   
-         
-seqnum int;
-         
-BEGIN  
+DECLARE
 
-seqnum :=  nextval('counter');
-      
+hello int;
+
+big float;
+
+gh float;
+
+cluster integer;
+
+BEGIN
+
+hello := nextval('counter');
+
 raise info 'start';
-
 
 truncate table new_string;
 
-
-insert into new_string(att_id, gram, tf, idf, norm)             //3 ms
+insert into new_string(att_id, gram, tf, idf, norm)
 select att_id, gram, tf, idf, norm
 from in_strings
 where  entity_id = $1
@@ -32,7 +59,7 @@ group by att_id,gram,tf,idf,norm;
 
 truncate table new_dist;
 
-insert into new_dist(name,value,stdev)                          //0.92 ms
+insert into new_dist(name,value,stdev)
 select  name, value, stdev
 from in_dists
 where entity_id = $1
@@ -41,134 +68,173 @@ group by name, value, stdev;
 
 raise info ' on results';
 
-
-
--- matching string columns in incoming entity with clusters seen so far,
--- new_string contains the grams for incoming entity ,  cid - cluster id from clusters seen so far
+--made just one table ------seen_strings, and replcaed with $1 --in both temp_a, and results, remove entity_id from , group by 
 
 truncate table results;
 
-insert into results(cid, att_id, score)                         //58.8 ms
-select  e.cid , d.att_id, ((SUM(d.tf*d.idf * e.tf*e.idf)::float) / (d.norm * e.norm))  as score
+insert into results(cid, att_id, score)
+select  e.cid , d.att_id, round(((SUM(d.tf*d.idf * e.tf*e.idf)) / (d.norm * e.norm))::numeric ,5) as score
      FROM new_string d, seen_strings e
-          WHERE d.gram = e.gram
-          AND d.att_id =e.att_id
+          WHERE d.att_id = e.att_id
+          AND d.gram =e.gram
          and d.norm <> 0
          and e.norm <> 0
           GROUP BY e.cid, d.att_id,d.norm,e.norm;
 
---matching numerical columns in incoming entity with clusters seen so far 
--- new_dist contains numerical columns of the incoming entity  
- 
+
+raise info ' on numerical results now ';
 
 truncate table temp_a;
 
-insert into temp_a(cid, name, score)                            // 3.93 ms
+insert into temp_a(cid, name, score)
 select e.cid ,d.name, (abs(d.value::float - e.value::float)  / e.stdev)
 from new_dist d , seen_dists e
 where d.name = e.name
 and e.stdev <> 0
 group by e.cid,d.name,d.value,e.value,e.stdev;
 
-
--- score for numerical columns assuming difference of > 5 stddev is equivalent to zero similarity
-
 raise info ' calculating result';
 
 truncate table results_dist;
 
-insert into results_dist(cid, name, score)                    // 3 ms
-select cid,name, (5.0 - score)/5.0
+insert into results_dist(cid, name, score)
+select cid,name, (3.0 - score)/3.0
 from temp_a
-where score < 5.0;
+where score < 3.0;
 
-insert into results_dist( cid, name, score)                   //  0.98 ms
+insert into results_dist( cid, name, score)
 select  cid,name, 0.0
 from temp_a
-where score >= 5.0;
+where score >= 3.0;
 
--- weighted sum for string column scores
 
 truncate table final;
 
-insert into final(cid, score)                                 //2.927 ms
+insert into final(cid, score)
 select  r.cid , sum(r.score * u.weight) as score
 from results r, UC_strings u
 where r.att_id =  u.att_id
+and r.score >0.5
 group by r.cid;
-
--- weighted sum for numerical column scores
 
 truncate table final_dists;
 
-insert into final_dists(cid, score)                           //   2.128 ms
+insert into final_dists(cid, score)
 select r.cid, sum(r.score *u.weight) as score
 from results_dist r, UC_dists u
 where r.name = u.name
+and r.score >0.3
 group by r.cid;
 
 
-update final                                                  // 1.769 ms
+update final
 set score = (final.score + t.score)
 from final_dists t
 where final.cid = t.cid;
 
--- threshold(k) for weighted sum of the column scores
+gh := mean from UC_mean;
 
-truncate table temp_matches_temp;                              
+truncate table temp_matches_temp;
 
-insert into temp_matches_temp(cid,score)                      //1.375 ms
+
+
+if (gh>5.2) then
+
+insert into temp_matches_temp(cid,score)
 select  i.cid, i.score
 from final i
-where i.score > k;
+where i.score > 34.0;
 
--- selecting the cid which got the highest score in case entity matches multiple clusters
+elsif( gh>4.6 AND gh<=5.2) then
+
+insert into temp_matches_temp(cid,score)
+select  i.cid, i.score
+from final i
+where i.score > 31.5;
+
+elsif( gh>3.8 AND gh<=4.6) then
+
+insert into temp_matches_temp(cid,score)
+select  i.cid, i.score
+from final i
+where i.score > 28.0;
+
+elsif( gh>=3.0 AND gh<=3.8) then
+
+
+insert into temp_matches_temp(cid,score)
+select  i.cid, i.score
+from final i
+where i.score > 24.0;
+
+elsif( gh>=2.0 AND gh<3.0) then
+
+insert into temp_matches_temp(cid,score)
+select  i.cid, i.score
+from final i
+where i.score > 18.0;
+
+elsif(gh>=1.6 AND  gh<2.0 ) then
+
+insert into temp_matches_temp(cid,score)
+select  i.cid, i.score
+from final i
+where i.score > 12.0;
+
+elsif(gh>=0.8 AND  gh<1.6 ) then
+
+insert into temp_matches_temp(cid,score)
+select  i.cid, i.score
+from final i
+where i.score >6.2;
+
+elsif(gh<0.8) then
+
+insert into temp_matches_temp(cid,score)
+select i.cid, i.score
+from final i
+where i.score >4.0;
+
+end if;
 
 truncate table temp_scores;
 
-insert into temp_scores(score)                                //1.355 ms
+insert into temp_scores(score)
 select max(score)
 from temp_matches_temp;
 
+
 truncate table temp_matches;
 
-insert into temp_matches(cid)                                 //1.201 ms
-select  t.cid
+insert into temp_matches(cid)
+select max(t.cid)
 from temp_matches_temp t, temp_scores s
-where t.score = s.score ;
+where t.score = s.score
+and t.cid >1;
 
-
-truncate table matched_string;
-
-insert into matched_string(att_id, gram)                      //22.634 ms
-select d.att_id, d.gram
-from seen_strings d, temp_matches e
-where d.cid = e.cid; 
-
-
--- cluster matched
 
 cluster := cid from temp_matches;
 
 ----------- updating the centroid
 
-if exists(select * from temp_matches) then
+
+if exists(select * from temp_matches e where e.cid > 1 ) then
 
 
 update new_string set tf =tf/2 ;
 
 
-update seen_strings e 
+update seen_strings e
 set tf = e.tf/2
 where e.cid = cluster;
 
 
-raise info 'the tf for matching att_id, gram pair';
+raise info 'combining the tf for matching att_id, gram pair';
 
-update seen_strings e 
-set tf = (e.tf+d.tf) 
+update seen_strings e
+set tf = (e.tf+d.tf)
 from new_string d
-where e.cid = cluster  
+where e.cid = cluster
 and e.att_id = d.att_id
 and e.gram = d.gram;
 
@@ -177,11 +243,10 @@ truncate table matched_string;
 
 insert into matched_string( att_id, gram)
 select d.att_id, d.gram
-from seen_strings d, new_string e 
+from seen_strings d, new_string e
 where d.cid = cluster
 and d.att_id = e.att_id
 and d.gram = e.gram;
-
 
 raise info 'inserting in seen_strings those att_id, gram which dont match from new_string';
 
@@ -191,95 +256,99 @@ from  new_string e
 where not exists ( select * from matched_string f where e.att_id = f.att_id and e.gram = f.gram)
 group by cluster, e.att_id, e.gram, e.tf, e.idf, e.norm;
 
-raise info 'insert in new norm';
+raise info 'insert in just_testing norm';
 
-truncate table new_norm;
+truncate table just_testing_norm;
 
-insert into new_norm(att_id, norm)
-select att_id, round((sqrt(SUM((tf*idf)^2))),5) norm
+insert into just_testing_norm(att_id, norm)
+select att_id, round((sqrt(SUM((tf*idf)^2)))::numeric,5) norm
 from seen_strings
- where cid = cluster 
+ where cid = cluster
  and tf > 0.00001
 and idf > 0.00001
 group by att_id;
 
 raise info 'updating norm of the seen_strings';
 
-update seen_strings 
-set norm = n.norm 
-from new_norm n 
+update seen_strings
+set norm = n.norm
+from just_testing_norm n
 where seen_strings.cid = cluster
 and seen_strings.att_id = n.att_id;
 
 
 end if;
-                   
 
 
+-------------------------------------------------------------------------------  CLUSTER_TABLE
 RAISE INFO 'inserting in  cluster table for the case of match';
 
+---------changed the code here
 
-insert into cluster_table(entity_id,cid)                           //1.163 ms
-select $1, cid
-from temp_matches ;
+if exists(select * from temp_matches e where e.cid > 1) then
 
-RAISE INFO ' inserting in case of a new cluster';
+insert into cluster_table(entity_id,cid)
+values($1,cluster);
 
-insert into cluster_table(entity_id, cid)                          //0.741 ms
+else
 
-select $1, nextval('this_is_it')
-where not exists( select * from temp_matches)
-;
+insert into cluster_table(entity_id, cid)
+values ($1, nextval('sequence1'));
 
--------  in case when incoming entity didnt match any cluster
+
+end if;
+
+-------   entities that dont match
 
 raise info 'inserting in seen_strings';
 
-INSERT INTO seen_strings(cid, att_id, gram, tf,idf,norm)            // 1.129 ms
+INSERT INTO seen_strings(cid, att_id, gram, tf,idf,norm)
 select  f.cid,d.att_id, d.gram, d.tf,d.idf,d.norm
 from new_string d, cluster_table f
-where not exists(select * from temp_matches)
+where not exists(select * from temp_matches e where e.cid > 1)
 and f.entity_id = $1
 group by f.cid, d.att_id, d.gram, d.tf, d.idf, d.norm;
 
+----strings done uptill here , now numeric updation
 
 raise info ' inserting in seen_dists';
+------ inserts in both cases, match or no match
 
---- seen_dists has the numerical columns of clusters seen so far
-
-insert into seen_dists(cid,name, value,stdev)                       //0.991 ms
+insert into seen_dists(cid,name, value,stdev)
 select f.cid, d.name, d.value,d.stdev
 from new_dist d, cluster_table f
 where f.entity_id = $1
+and f.cid >1
 group by f.cid, d.name, d.value, d.stdev;
 
 
--- updating idf/norm after every 100th iteration
 
-if (seqnum%100 = 0) then
+
+---------------------- ok here is the point where you need to update your code with if else
+
+
+if (hello%100 = 0) then
 
 raise info 'distinct_entiti';
 
 truncate table distinct_entiti;
 
-insert into distinct_entiti(entities)                                //9.577 ms
+insert into distinct_entiti(entities)
 select count(distinct cid)
 from seen_strings;
-
---- updating the idf, norm of the clusters seen so far 
 
 truncate table seen_idf;
 
 raise info 'seen_idf';
 
-insert into seen_idf(att_id,gram,idf)                                 //59.210 ms
+insert into seen_idf(att_id,gram,idf)
 select y.att_id,y.gram,( d.entities ) /(count(*)::float) as idf
 from seen_strings y, distinct_entiti d
 group by y.att_id,y.gram, d.entities;
 
-raise info 'update seen_strings';
+raise info 'update public.seen_strings';
 
-update seen_strings                                                   //48.659 ms
+update seen_strings
 set idf = d.idf
 from seen_idf d
 where seen_strings.att_id = d.att_id
@@ -289,32 +358,33 @@ raise info 'insert into seen_norms';
 
 truncate table seen_norms;
 
-insert into seen_norms(cid, att_id, norm)                              // 42.161 ms
-SELECT a.cid,a.att_id,(sqrt(SUM((a.tf*b.idf)^2))) norm
+insert into seen_norms(cid, att_id, norm)
+     SELECT a.cid,a.att_id,round((sqrt(SUM((a.tf*b.idf)^2)))::numeric,5) norm
        FROM seen_strings a, seen_idf b
       WHERE a.gram = b.gram
         and a.att_id = b.att_id
+         and a.tf > 0.00001
+        and b.idf > 0.00001
    GROUP BY a.cid,a.att_id;
 
-raise info ' update seen_strings';
+raise info ' update public.seen_strings';
 
-update seen_strings                                                   //37.321 ms
+update seen_strings
 set norm = n.norm
 from seen_norms n
 where seen_strings.cid = n.cid
 and seen_strings.att_id = n.att_id;
 
-end if;
 
+end if ;
 
--- updating standard deviation of the numerical columns of the clusters seen so far 
 
 raise info 'insert into seen_dist_sums';
 
 truncate seen_dist_sums;
 truncate seen_temp_dists;
 
-insert into seen_dist_sums( name , n, sm , smsqr )                      //2.95
+insert into seen_dist_sums( name , n, sm , smsqr )
      SELECT name, COUNT(*) n,
             SUM(value::float)::float sm, SUM(value::float*value::float)::float smsqr
        FROM seen_dists
@@ -323,22 +393,19 @@ insert into seen_dist_sums( name , n, sm , smsqr )                      //2.95
 raise info 'insert into seen_temp_dists';
 
 
-insert into seen_temp_dists( name,count, mean, stdev )                    //1.41 ms
+insert into seen_temp_dists( name,count, mean, stdev )
 SELECT  name, n, sm/n mean, sqrt(abs((smsqr - sm*sm/n) / (n-1)) ) stdev
  FROM seen_dist_sums
  WHERE n > 1;
 
 
-update seen_dists                                        //3.22 ms
+update seen_dists
 set stdev =  a.stdev
 from seen_temp_dists a
 where a.name = seen_dists.name;
 
+raise info 'one_entity_over';
 
-raise info 'one entity done';
-
-end
+END
 $$ LANGUAGE plpgsql;
-
-
 
