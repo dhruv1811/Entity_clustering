@@ -409,3 +409,138 @@ raise info 'one_entity_over';
 END
 $$ LANGUAGE plpgsql;
 
+
+drop table if exists jj;
+drop table if exists scoringsfp1 cascade;
+drop table if exists scoringsfn1 cascade;
+drop table if exists fp;
+drop table if exists fp1;
+drop table if exists table231;
+drop table if exists table232;
+drop table if exists fn1;
+drop table if exists fn;
+
+drop table if exists fp2;
+drop table if exists fp3 cascade;
+drop table if exists fn2;
+drop table if exists fn3 cascade;
+
+
+create table jj(global_id integer, cid integer, entity_id integer);
+
+--create table scoringsfp(cid integer, score integer);
+create table fp1(global_id integer, cid integer, entity_id integer);
+create table table231(cid integer, count1 integer, count2 integer);
+create table fp(cid integer, count integer);
+create table fp2(global_id integer,cid integer, count integer);
+create table fp3(entity_id integer);
+
+
+--create table scoringsfn(global_id integer, score integer);
+create table fn1(global_id integer, cid integer, entity_id integer);
+create table fn2(global_id integer,cid integer, count integer);
+create table fn3(entity_id integer);
+create table  table232(global_id integer, count1 integer, count2 integer);
+create table fn(global_id integer, count integer);
+create table scoringsfp1(count integer);
+create table scoringsfn1(count integer);
+
+
+
+CREATE OR REPLACE FUNCTION fpfn(integer) RETURNS void AS
+$$
+BEGIN
+
+raise info 'truncating tables';
+
+truncate table fn;
+truncate table  fn1;
+truncate table fn2;
+truncate table fn3;
+
+truncate table fp;
+truncate table fp1;
+truncate table  fp2;
+truncate table fp3;
+truncate table  jj;
+truncate table scoringsfp1;
+truncate table scoringsfn1;
+
+raise info ' insert into jj';
+
+insert into jj(global_id, cid,  entity_id)
+select d.global_id, e.cid, e.entity_id
+from cluster_table e, test_matching d
+where d.local_id = e.entity_id
+group by d.global_id, e.cid, e.entity_id;
+
+
+raise info 'fp';
+
+insert into fp(cid, count)
+select cid , count(*) from jj
+group by cid;
+
+insert into fn(global_id, count)
+select global_id, count(*) from jj
+group by global_id;
+
+
+insert into fp1(global_id, cid, entity_id)
+select e.global_id, e.cid, e.entity_id
+from jj e, fp d
+where d.count>1 and d.cid = e.cid;
+
+insert into fp2(global_id,cid, count)
+select d.global_id, d.cid, count(*)
+from fp1 d
+group by d.global_id, d.cid;
+
+insert into fp3(entity_id)
+select distinct d.entity_id
+from fp1 d, fp2 e
+where d.global_id = e.global_id
+and d.cid = e.cid
+and e.count = 1;
+
+
+
+insert into fn1(global_id, cid, entity_id)
+select e.global_id, e.cid, e.entity_id
+from jj e, fn d
+where d.count>1 and d.global_id = e.global_id;
+
+insert into fn2(global_id,cid, count)
+select d.global_id, d.cid, count(*)
+from fn1 d
+group by d.global_id, d.cid;
+
+insert into fn3(entity_id)
+select distinct d.entity_id
+from fn1 d, fn2 e
+
+delete from fn3
+where exists(select d.entity_id from fp3 d where  d.entity_id = fn3.entity_id);
+
+
+insert into  scoringsfp1(count)
+ select count(distinct entity_id) as count
+from fp3;
+
+insert into  scoringsfn1(count)
+ select count(distinct entity_id) as count
+from fn3;
+
+
+insert into output48(category_id,entity, fp, fn)
+select $1, count(distinct d.entity_id), k.count, p.count
+from test_category d, scoringsfp1 k, scoringsfn1 p
+group by k.count, p.count;
+
+
+end
+$$ LANGUAGE plpgsql;
+
+
+
+
